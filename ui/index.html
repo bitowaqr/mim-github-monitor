@@ -935,7 +935,7 @@ function openSettings() {
         <button class="btn" id="btn-validate" ${S.tokenSet ? '' : 'disabled'}>Validate token</button>
         <span class="validation" id="validation"></span>
       </div>
-      <div class="hint">Classic PAT with repo, read:org, read:project scopes. Stored in the OS keychain — never written to files.</div>
+      <div class="hint">Classic PAT with repo, read:org, and read:project (or project) scopes. Stored in the OS keychain — never written to files.</div>
     </div>
 
     <div class="field">
@@ -1020,7 +1020,7 @@ async function validateToken() {
     const missing = [
       hasScope(scopes, 'repo') ? null : 'repo',
       hasScope(scopes, 'read:org', ['admin:org']) ? null : 'read:org',
-      hasScope(scopes, 'read:project') ? null : 'read:project',
+      hasScope(scopes, 'read:project', ['project']) ? null : 'read:project',
     ].filter(Boolean)
     out.className = 'validation ok'
     out.textContent = `OK — ${result.login}${scopes.length ? ` (${scopes.join(', ')})` : ''}`
