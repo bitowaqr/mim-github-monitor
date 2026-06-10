@@ -62,3 +62,9 @@ npm test        # vitest — backend logic runs against a fake runtime ctx
 Backend modules are plain ESM with the runtime `ctx` injected, so everything
 (sync engine, bisection, rate-limit handling, summarizer) is unit-tested
 without network or Electron. See `docs/plan.md` for the full design.
+
+## Docs
+
+- `docs/app.md` — user/operator documentation for installing, configuring,
+  syncing, summaries, permissions, and troubleshooting.
+- `docs/plan.md` — original build plan and architecture notes.
