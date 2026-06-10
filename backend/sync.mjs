@@ -4,11 +4,12 @@
 
 import { RateLimitError } from './github.mjs'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 const SEARCH_PAGE = 100
 const SEARCH_CAP = 1000
 const BODY_EXCERPT = 2000
 const RATE_WAIT_MAX_MS = 90_000
+const OPEN_ITEMS_START = '2008-01-01T00:00:00Z'
 
 // Package data ids must match /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/.
 // Real keys ('owner/repo#12') live inside the record; ids are derived.
@@ -22,8 +23,14 @@ export function safeId(key) {
   return `${slug || 'x'}-${hash.toString(36)}`
 }
 
-export function buildSearchQuery(org, fromIso, toIso) {
-  return `org:${org} updated:${fromIso}..${toIso} sort:updated-asc`
+export function searchTimestamp(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid GitHub search timestamp: ${iso}`)
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
+export function buildSearchQuery(org, fromIso, toIso, qualifiers = []) {
+  return [`org:${org}`, ...qualifiers, `updated:${searchTimestamp(fromIso)}..${searchTimestamp(toIso)}`, 'sort:updated-asc'].join(' ')
 }
 
 export function mapSearchNode(node) {
@@ -185,7 +192,7 @@ export async function syncItemSlice(gh, org, fromIso, toIso, onPage, opts = {}) 
 }
 
 async function fetchSlice(gh, org, fromIso, toIso, onPage, state, opts, depth) {
-  const q = buildSearchQuery(org, fromIso, toIso)
+  const q = buildSearchQuery(org, fromIso, toIso, opts.qualifiers || [])
   let cursor = null
   let firstPage = true
   do {
@@ -348,6 +355,7 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
 
   const summary = { org, full, items: 0, repos: 0, events: 0, projects: 0, truncated: [], errors: [] }
   let watermark = full ? null : prior.watermark || null
+  let itemPhaseOk = true
 
   await ctx.progress.step('Repositories')
   try {
@@ -359,21 +367,30 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
 
   await ctx.progress.step('Issues and pull requests')
   const items = ctx.data.collection('items')
+  const ingestItems = async (records) => {
+    const allowed = records.filter((r) => repoAllowed(r.repo, settings))
+    for (const record of allowed) await items.put(safeId(record.key), record)
+    const maxUpdated = allowed.reduce((acc, r) => (r.updatedAt > acc ? r.updatedAt : acc), watermark || '')
+    if (maxUpdated && (!watermark || maxUpdated > watermark)) {
+      watermark = maxUpdated
+      // Persist after the page lands so a crashed run resumes without gaps.
+      if (!full) await ctx.data.kv.set('syncState', { ...prior, schemaVersion: SCHEMA_VERSION, watermark })
+    }
+    await ctx.progress.progress(Math.min(0.2 + summary.items / 2000, 0.8), `${summary.items + allowed.length} items`)
+    summary.items += allowed.length
+  }
   try {
-    const slice = await syncItemSlice(gh, org, fromIso, now, async (records) => {
-      const allowed = records.filter((r) => repoAllowed(r.repo, settings))
-      for (const record of allowed) await items.put(safeId(record.key), record)
-      const maxUpdated = allowed.reduce((acc, r) => (r.updatedAt > acc ? r.updatedAt : acc), watermark || '')
-      if (maxUpdated && (!watermark || maxUpdated > watermark)) {
-        watermark = maxUpdated
-        // Persist after the page lands so a crashed run resumes without gaps.
-        await ctx.data.kv.set('syncState', { ...prior, schemaVersion: SCHEMA_VERSION, watermark })
-      }
-      await ctx.progress.progress(Math.min(0.2 + summary.items / 2000, 0.8), `${summary.items + allowed.length} items`)
-      summary.items += allowed.length
-    }, opts)
-    summary.truncated = slice.truncated
+    if (full) {
+      const open = await syncItemSlice(gh, org, OPEN_ITEMS_START, now, ingestItems, { ...opts, qualifiers: ['is:open'] })
+      const closed = await syncItemSlice(gh, org, windowStart, now, ingestItems, { ...opts, qualifiers: ['is:closed'] })
+      summary.truncated = [...open.truncated, ...closed.truncated]
+    } else {
+      const slice = await syncItemSlice(gh, org, fromIso, now, ingestItems, opts)
+      summary.truncated = slice.truncated
+    }
   } catch (err) {
+    itemPhaseOk = false
+    watermark = prior.watermark || null
     if (err instanceof RateLimitError) throw err
     summary.errors.push({ phase: 'items', message: err.message })
   }
@@ -401,8 +418,8 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
   }
 
   await ctx.data.kv.set('syncState', {
-    schemaVersion: SCHEMA_VERSION,
-    watermark: watermark || now,
+    schemaVersion: itemPhaseOk ? SCHEMA_VERSION : prior.schemaVersion,
+    watermark: itemPhaseOk ? watermark || now : prior.watermark || null,
     eventsEtag: prior.eventsEtag || null,
     lastSyncAt: now,
     lastSummary: summary,

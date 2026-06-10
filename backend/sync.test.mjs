@@ -4,6 +4,7 @@ import {
   SCHEMA_VERSION,
   safeId,
   buildSearchQuery,
+  searchTimestamp,
   mapSearchNode,
   repoAllowed,
   eventSummary,
@@ -57,9 +58,20 @@ describe('safeId', () => {
 })
 
 describe('buildSearchQuery', () => {
+  it('formats GitHub search timestamps without JavaScript milliseconds', () => {
+    expect(searchTimestamp('2026-01-01T00:00:00.000Z')).toBe('2026-01-01T00:00:00Z')
+    expect(searchTimestamp('2026-01-01T01:02:03+01:00')).toBe('2026-01-01T00:02:03Z')
+  })
+
   it('builds an oldest-first updated-range query', () => {
     expect(buildSearchQuery('acme', '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z')).toBe(
-      'org:acme updated:2026-01-01T00:00:00.000Z..2026-01-02T00:00:00.000Z sort:updated-asc',
+      'org:acme updated:2026-01-01T00:00:00Z..2026-01-02T00:00:00Z sort:updated-asc',
+    )
+  })
+
+  it('adds search qualifiers before the updated range', () => {
+    expect(buildSearchQuery('acme', '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', ['is:open'])).toBe(
+      'org:acme is:open updated:2026-01-01T00:00:00Z..2026-01-02T00:00:00Z sort:updated-asc',
     )
   })
 })
@@ -139,9 +151,13 @@ describe('syncItemSlice', () => {
     const afterMid = '2026-01-01T12:00:01.000Z'
     const gh = {
       async graphql(query, { q }) {
-        if (q.includes(`${from}..${to}`)) return searchResult([], { issueCount: 1500 })
-        if (q.includes(`${from}..${mid}`)) return searchResult([issueNode('acme/a', 1, '2026-01-01T06:00:00.000Z')])
-        if (q.includes(`${afterMid}..${to}`)) return searchResult([issueNode('acme/a', 2, '2026-01-01T18:00:00.000Z')])
+        if (q.includes('2026-01-01T00:00:00Z..2026-01-02T00:00:00Z')) return searchResult([], { issueCount: 1500 })
+        if (q.includes('2026-01-01T00:00:00Z..2026-01-01T12:00:00Z')) {
+          return searchResult([issueNode('acme/a', 1, '2026-01-01T06:00:00.000Z')])
+        }
+        if (q.includes('2026-01-01T12:00:01Z..2026-01-02T00:00:00Z')) {
+          return searchResult([issueNode('acme/a', 2, '2026-01-01T18:00:00.000Z')])
+        }
         throw new Error(`unexpected query: ${q}`)
       },
     }
@@ -276,7 +292,7 @@ describe('syncEvents', () => {
 })
 
 describe('runSync', () => {
-  function fakeGh({ queries = [], searchNodes = [], events = [], failEvents = false } = {}) {
+  function fakeGh({ queries = [], searchNodes = [], events = [], failSearch = false, failEvents = false } = {}) {
     return {
       async graphql(query, vars) {
         queries.push(vars.q || query.slice(0, 40))
@@ -301,7 +317,11 @@ describe('runSync', () => {
             },
           }
         }
-        if (query.includes('search(')) return searchResult(searchNodes)
+        if (query.includes('search(')) {
+          if (failSearch) throw new Error('search exploded')
+          if (vars.q.includes('is:closed')) return searchResult([])
+          return searchResult(searchNodes)
+        }
         if (query.includes('projectsV2(')) {
           return {
             organization: {
@@ -383,7 +403,7 @@ describe('runSync', () => {
     const queries = []
     await runSync(ctx, fakeGh({ queries }), {}, { nowIso: () => NOW })
     const searchQ = queries.find((q) => q.startsWith('org:acme updated:'))
-    expect(searchQ).toBe(`org:acme updated:2026-06-05T00:00:00.000Z..${NOW} sort:updated-asc`)
+    expect(searchQ).toBe('org:acme updated:2026-06-05T00:00:00Z..2026-06-10T12:00:00Z sort:updated-asc')
   })
 
   it('forces a full window sync when the schema version changed', async () => {
@@ -391,8 +411,18 @@ describe('runSync', () => {
     const queries = []
     const summary = await runSync(ctx, fakeGh({ queries }), {}, { nowIso: () => NOW })
     expect(summary.full).toBe(true)
-    const searchQ = queries.find((q) => q.startsWith('org:acme updated:'))
-    expect(searchQ).toContain('updated:2026-03-12T12:00:00.000Z..') // NOW − 90 days
+    expect(queries).toContain('org:acme is:open updated:2008-01-01T00:00:00Z..2026-06-10T12:00:00Z sort:updated-asc')
+    expect(queries).toContain('org:acme is:closed updated:2026-03-12T12:00:00Z..2026-06-10T12:00:00Z sort:updated-asc')
+  })
+
+  it('does not advance the watermark or schema version when the item phase fails', async () => {
+    const prior = { schemaVersion: 0, watermark: '2026-06-05T00:00:00.000Z' }
+    const ctx = await configuredCtx({ org: 'acme' }, prior)
+    const summary = await runSync(ctx, fakeGh({ failSearch: true }), {}, { nowIso: () => NOW })
+    expect(summary.errors).toEqual([{ phase: 'items', message: 'search exploded' }])
+    const state = await ctx.data.kv.get('syncState')
+    expect(state.schemaVersion).toBe(0)
+    expect(state.watermark).toBe(prior.watermark)
   })
 
   it('filters items by the repo settings', async () => {

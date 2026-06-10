@@ -237,6 +237,22 @@
     .setup-card { max-width: 380px; text-align: center; }
     .setup-card h2 { font-size: 15px; margin-bottom: 6px; }
     .setup-card p { font-size: 12px; color: var(--color-ink-3); margin-bottom: var(--space-md); }
+    .empty-stack { max-width: 420px; text-align: center; color: var(--color-ink-3); font-size: 12px; }
+    .empty-stack p { margin-bottom: var(--space-sm); }
+    .repo-snapshot {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-sm);
+      margin: var(--space-md) 0;
+    }
+    .snapshot-cell {
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      background: var(--color-surface);
+    }
+    .snapshot-value { display: block; font-size: 16px; font-weight: 600; color: var(--color-ink); }
+    .snapshot-label { display: block; margin-top: 2px; font-size: 10px; color: var(--color-ink-4); }
 
     /* ── Settings modal ── */
     .overlay {
@@ -480,6 +496,14 @@ function uniqueSorted(values) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b))
 }
 
+function repoTotals() {
+  return {
+    repos: S.repos.length,
+    openIssues: S.repos.reduce((sum, repo) => sum + (repo.openIssues || 0), 0),
+    openPrs: S.repos.reduce((sum, repo) => sum + (repo.openPrs || 0), 0),
+  }
+}
+
 function allPeople() {
   return uniqueSorted([
     ...S.items.flatMap((i) => [i.author, ...(i.assignees || [])]),
@@ -528,6 +552,7 @@ function summaryRange() {
 // ── Render: rail ───────────────────────────────────────────────────────────
 
 function renderRail() {
+  const totals = repoTotals()
   const counts = {
     all: S.items.length,
     issues: S.items.filter((i) => i.type === 'issue' && i.state === 'OPEN').length,
@@ -551,8 +576,14 @@ function renderRail() {
     ${S.savedViews.length ? '<div class="rail-section">Saved</div>' : ''}
     ${saved}
     <div class="rail-footer">
+      ${totals.repos ? `
+        <div class="rail-section" style="padding-left:0">Repo index</div>
+        <div class="sync-meta">${totals.repos} repos</div>
+        <div class="sync-meta">${totals.openIssues} open issues</div>
+        <div class="sync-meta">${totals.openPrs} open PRs</div>` : ''}
       <div class="sync-meta">${S.settings?.org ? `org: ${esc(S.settings.org)}` : 'not configured'}</div>
       <div class="sync-meta">synced ${fmtAgo(S.syncState?.lastSyncAt)}</div>
+      ${S.syncState?.lastSummary?.errors?.length ? '<div class="sync-meta" style="color:var(--color-rem)">last sync had errors</div>' : ''}
       <button class="rail-item" data-action="settings" style="padding-left:0">⚙ Settings</button>
     </div>`
 
@@ -737,7 +768,7 @@ function stateDot(item) {
 function renderList() {
   const rows = viewItems()
   if (rows.length === 0) {
-    $('pane').innerHTML = `<div class="empty"><p style="color:var(--color-ink-4);font-size:12px">${S.items.length === 0 ? 'No data yet — run a sync.' : 'Nothing matches.'}</p></div>`
+    renderEmptyItems(S.items.length === 0 ? 'No item details synced yet.' : 'Nothing matches.')
     return
   }
   $('pane').innerHTML = rows.map((item) => `
@@ -771,7 +802,7 @@ function renderBoard() {
       .filter((c) => c.items.length > 0)
   }
   if (columns.length === 0) {
-    $('pane').innerHTML = `<div class="empty"><p style="color:var(--color-ink-4);font-size:12px">Nothing matches.</p></div>`
+    renderEmptyItems(S.items.length === 0 ? 'No item details synced yet.' : 'Nothing matches.')
     return
   }
   $('pane').innerHTML = `<div class="board">${columns.map((col) => `
@@ -791,6 +822,24 @@ function renderBoard() {
   $('pane').querySelectorAll('[data-key]').forEach((el) => {
     el.addEventListener('click', () => selectItem(el.dataset.key))
   })
+}
+
+function renderEmptyItems(message) {
+  const totals = repoTotals()
+  if (S.items.length === 0 && totals.repos > 0) {
+    $('pane').innerHTML = `<div class="empty"><div class="empty-stack">
+      <p>${esc(message)} The repository index is present; run a full re-sync to rebuild issue and PR details.</p>
+      <div class="repo-snapshot">
+        <div class="snapshot-cell"><span class="snapshot-value">${totals.repos}</span><span class="snapshot-label">repos</span></div>
+        <div class="snapshot-cell"><span class="snapshot-value">${totals.openIssues}</span><span class="snapshot-label">open issues</span></div>
+        <div class="snapshot-cell"><span class="snapshot-value">${totals.openPrs}</span><span class="snapshot-label">open PRs</span></div>
+      </div>
+      <button class="btn primary" id="btn-empty-fullsync">Full re-sync</button>
+    </div></div>`
+    $('btn-empty-fullsync').addEventListener('click', () => startSync(true))
+    return
+  }
+  $('pane').innerHTML = `<div class="empty"><p style="color:var(--color-ink-4);font-size:12px">${esc(message || 'No data yet. Run a sync.')}</p></div>`
 }
 
 function renderActivity() {
@@ -946,7 +995,7 @@ function openSettings() {
     <div class="field">
       <label>Sync window (days)</label>
       <input type="number" id="set-window" value="${esc(s.syncWindowDays || 90)}" min="1" max="730">
-      <div class="hint">How far back issues, PRs, and activity are kept.</div>
+      <div class="hint">How far back recently closed items and activity are kept. Open issues and PRs are always indexed.</div>
     </div>
 
     <div class="field">

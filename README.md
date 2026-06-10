@@ -18,7 +18,7 @@ git clone https://github.com/bitowaqr/mim-github-monitor github-monitor
 
 1. Open the **GitHub** view in Mim and hit **Settings**.
 2. Paste a GitHub **classic personal access token** with scopes
-   `repo`, `read:org`, `read:project`
+   `repo`, `read:org`, `read:project` (or `project`)
    (create one at github.com/settings/tokens). The token is stored in the OS
    keychain — it never touches a file and is never shown again.
 3. Enter your organization name, optionally narrow the repository list, and
@@ -27,10 +27,10 @@ git clone https://github.com/bitowaqr/mim-github-monitor github-monitor
 
 ## What it does
 
-- **Sync** (incremental, resumable): repositories, issues + PRs via GraphQL
-  search with a watermark and automatic time-range bisection around GitHub's
-  1,000-result search cap, the org activity feed via REST with ETags, and
-  ProjectsV2 board statuses denormalized onto items.
+- **Sync** (incremental, resumable): repositories, all currently open issues +
+  PRs, recently closed items in the sync window, GraphQL search time-range
+  bisection around GitHub's 1,000-result search cap, the org activity feed via
+  REST with ETags, and ProjectsV2 board statuses denormalized onto items.
 - **Views**: built-ins (all items, open issues, open PRs, recently closed,
   activity feed) plus saved views; list and board layouts; filter by type,
   state, repo, person, label, project status, or free text.
