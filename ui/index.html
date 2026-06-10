@@ -375,7 +375,7 @@ async function loadAuxiliary() {
   try {
     const tools = await runtime.tools.list()
     const tool = tools.find((t) => t.packageId === 'github-monitor' && t.id === 'validateToken')
-    S.validateToolName = tool?.publicName || null
+    S.validateToolName = tool?.name || null
   } catch { S.validateToolName = null }
 }
 
