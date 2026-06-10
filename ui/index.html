@@ -1017,7 +1017,11 @@ async function validateToken() {
     if (!S.validateToolName) throw new Error('validateToken tool not available')
     const result = await runtime.call('package.tools.execute', { name: S.validateToolName, input: {} })
     const scopes = (result.scopes || '').split(',').map((s) => s.trim()).filter(Boolean)
-    const missing = ['repo', 'read:org'].filter((s) => !scopes.includes(s))
+    const missing = [
+      hasScope(scopes, 'repo') ? null : 'repo',
+      hasScope(scopes, 'read:org', ['admin:org']) ? null : 'read:org',
+      hasScope(scopes, 'read:project') ? null : 'read:project',
+    ].filter(Boolean)
     out.className = 'validation ok'
     out.textContent = `OK — ${result.login}${scopes.length ? ` (${scopes.join(', ')})` : ''}`
     if (missing.length && scopes.length) {
@@ -1028,6 +1032,10 @@ async function validateToken() {
     out.className = 'validation err'
     out.textContent = err.message
   }
+}
+
+function hasScope(scopes, required, equivalents = []) {
+  return scopes.includes(required) || equivalents.some((scope) => scopes.includes(scope))
 }
 
 async function saveSettings(fullSync) {
