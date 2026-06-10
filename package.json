@@ -1,0 +1,31 @@
+{
+  "name": "mim-github-monitor",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mim package: org-wide GitHub issues, PRs, project boards, and activity with saved views and AI summaries.",
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.5"
+  },
+  "mim": {
+    "manifestVersion": 1,
+    "id": "github-monitor",
+    "name": "GitHub Monitor",
+    "icon": "G",
+    "description": "Org-wide GitHub issues, PRs, project boards, and activity with saved views and AI summaries.",
+    "views": [
+      { "id": "main", "label": "GitHub", "src": "./ui/index.html", "role": "work" }
+    ],
+    "backend": "./backend/index.mjs",
+    "permissions": {
+      "workspace": { "read": true, "write": true },
+      "ai": true,
+      "http": ["api.github.com"],
+      "secrets": ["github_token"]
+    },
+    "engines": { "mim": "runtime-v1" }
+  }
+}

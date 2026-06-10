@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="/sdk/tokens.css">
+  <title>GitHub</title>
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+    body { display: flex; }
+
+    /* ── View rail ── */
+    .rail {
+      width: 184px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--color-rule-light);
+      background: var(--color-chrome-high);
+      padding: var(--space-sm) 0;
+      overflow-y: auto;
+    }
+    .rail-section {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink-4);
+      padding: var(--space-sm) var(--space-md) 4px;
+    }
+    .rail-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      text-align: left;
+      padding: 5px var(--space-md);
+      font-size: 12px;
+      color: var(--color-ink-2);
+    }
+    .rail-item:hover { background: var(--color-chrome-mid); }
+    .rail-item.active { background: var(--color-accent-soft); color: var(--color-accent); font-weight: 500; }
+    .rail-item .count { margin-left: auto; font-size: 10px; color: var(--color-ink-4); }
+    .rail-item .del { display: none; margin-left: auto; color: var(--color-ink-4); font-size: 11px; padding: 0 2px; }
+    .rail-item:hover .del { display: inline; }
+    .rail-item .del:hover { color: var(--color-rem); }
+    .rail-footer { margin-top: auto; padding: var(--space-sm) var(--space-md) 2px; border-top: 1px solid var(--color-rule-light); }
+    .sync-meta { font-size: 10px; color: var(--color-ink-4); padding: 4px 0; }
+
+    /* ── Main ── */
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 6px var(--space-md);
+      border-bottom: 1px solid var(--color-rule-light);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .toolbar-title { font-size: 12px; font-weight: 600; color: var(--color-ink-2); white-space: nowrap; }
+    .toolbar-spacer { flex: 1; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--color-ink-2);
+      border: 1px solid var(--color-rule);
+      background: var(--color-surface);
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--color-chrome-mid); }
+    .btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+    .btn.primary:hover { opacity: 0.9; }
+    .btn.danger { color: var(--color-rem); }
+    .btn:disabled { opacity: 0.5; }
+    .select {
+      font-size: 11px;
+      color: var(--color-ink-2);
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-sm);
+      padding: 2px 6px;
+      height: 24px;
+      outline: none;
+      max-width: 150px;
+    }
+    .select:focus { border-color: var(--color-accent); }
+    .search-box {
+      display: flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: var(--radius-md);
+      background: var(--color-chrome-mid);
+      border: 1px solid var(--color-rule-light);
+    }
+    .search-box:focus-within { border-color: var(--color-accent); }
+    .search-input {
+      width: 150px;
+      background: transparent;
+      border: none;
+      font-size: 11px;
+      color: var(--color-ink);
+      outline: none;
+      padding: 0;
+    }
+    .pill {
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 11px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--color-ink-3);
+      border: 1px solid var(--color-rule-light);
+    }
+    .pill:hover { background: var(--color-chrome-mid); }
+    .pill.active { color: var(--color-accent); border-color: var(--color-accent); background: var(--color-accent-soft); }
+    .sync-progress { font-size: 10px; color: var(--color-ink-3); display: flex; align-items: center; gap: 6px; }
+    .sync-bar { width: 80px; height: 3px; background: var(--color-rule-light); border-radius: 2px; overflow: hidden; }
+    .sync-bar i { display: block; height: 100%; background: var(--color-accent); transition: width 0.3s; }
+
+    .content { flex: 1; min-height: 0; display: flex; }
+    .pane { flex: 1; min-width: 0; overflow-y: auto; }
+
+    /* ── List ── */
+    .row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 6px var(--space-md);
+      border-bottom: 1px solid var(--color-line-soft);
+      cursor: default;
+    }
+    .row:hover { background: var(--color-chrome-high); }
+    .row.selected { background: var(--color-accent-tint); }
+    .state-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .row-key { font-family: var(--font-mono); font-size: 10px; color: var(--color-ink-4); flex-shrink: 0; width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row-title { font-size: 12px; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 60px; }
+    .row-labels { display: flex; gap: 4px; flex-shrink: 1; min-width: 0; overflow: hidden; }
+    .label-chip {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--color-rule-light);
+      color: var(--color-ink-3);
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .label-chip i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .row-meta { font-size: 10px; color: var(--color-ink-4); flex-shrink: 0; white-space: nowrap; }
+    .row-author { font-size: 10px; color: var(--color-ink-3); flex-shrink: 0; width: 90px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Board ── */
+    .board { display: flex; gap: var(--space-md); padding: var(--space-md); overflow-x: auto; height: 100%; align-items: flex-start; }
+    .column { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 100%; }
+    .column-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--color-ink-2); padding: 0 4px 8px; }
+    .column-head .count { font-weight: 400; color: var(--color-ink-4); }
+    .column-cards { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .gcard {
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      cursor: default;
+    }
+    .gcard:hover { border-color: var(--color-rule); }
+    .gcard.selected { border-color: var(--color-accent); }
+    .gcard-key { font-family: var(--font-mono); font-size: 9px; color: var(--color-ink-4); }
+    .gcard-title { font-size: 11.5px; color: var(--color-ink); margin: 2px 0 4px; }
+    .gcard-meta { font-size: 9.5px; color: var(--color-ink-4); display: flex; gap: 6px; }
+
+    /* ── Activity feed ── */
+    .feed { padding: var(--space-sm) var(--space-md); }
+    .feed-day { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink-4); padding: var(--space-md) 0 4px; }
+    .feed-row { display: flex; gap: var(--space-sm); padding: 3px 0; font-size: 11.5px; align-items: baseline; }
+    .feed-time { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-ink-4); width: 36px; flex-shrink: 0; }
+    .feed-actor { font-weight: 500; color: var(--color-ink-2); flex-shrink: 0; }
+    .feed-repo { color: var(--color-ink-4); font-size: 10px; flex-shrink: 0; }
+    .feed-summary { color: var(--color-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Detail panel ── */
+    .detail {
+      width: 320px;
+      flex-shrink: 0;
+      border-left: 1px solid var(--color-rule-light);
+      overflow-y: auto;
+      padding: var(--space-md);
+      background: var(--color-chrome-high);
+    }
+    .detail-key { font-family: var(--font-mono); font-size: 10px; color: var(--color-ink-4); }
+    .detail-title { font-size: 14px; font-weight: 600; margin: 4px 0 8px; user-select: text; -webkit-user-select: text; }
+    .detail-grid { display: grid; grid-template-columns: 78px 1fr; gap: 4px 8px; font-size: 11px; margin: var(--space-sm) 0; }
+    .detail-grid dt { color: var(--color-ink-4); }
+    .detail-grid dd { color: var(--color-ink-2); user-select: text; -webkit-user-select: text; }
+    .detail-body {
+      font-size: 11.5px;
+      color: var(--color-ink-2);
+      white-space: pre-wrap;
+      user-select: text;
+      -webkit-user-select: text;
+      border-top: 1px solid var(--color-rule-light);
+      padding-top: var(--space-sm);
+      margin-top: var(--space-sm);
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .detail-close { float: right; color: var(--color-ink-4); font-size: 13px; }
+    .detail-close:hover { color: var(--color-ink); }
+
+    /* ── Summaries ── */
+    .summaries { padding: var(--space-md); max-width: 660px; }
+    .summaries h2 { font-size: 14px; margin-bottom: var(--space-sm); }
+    .sum-controls { display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center; margin-bottom: var(--space-md); }
+    .sum-controls input[type="date"] { height: 24px; font-size: 11px; }
+    .sum-controls input[type="text"] { height: 24px; font-size: 11px; width: 220px; }
+    .report-row {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-sm);
+      padding: 7px 0;
+      border-bottom: 1px solid var(--color-line-soft);
+    }
+    .report-date { font-family: var(--font-mono); font-size: 10px; color: var(--color-ink-4); flex-shrink: 0; }
+    .report-headline { font-size: 12px; color: var(--color-ink); flex: 1; }
+    .report-range { font-size: 10px; color: var(--color-ink-4); flex-shrink: 0; }
+    .report-open { font-size: 10px; color: var(--color-accent); flex-shrink: 0; }
+
+    /* ── Empty / setup ── */
+    .empty { display: flex; align-items: center; justify-content: center; height: 100%; }
+    .setup-card { max-width: 380px; text-align: center; }
+    .setup-card h2 { font-size: 15px; margin-bottom: 6px; }
+    .setup-card p { font-size: 12px; color: var(--color-ink-3); margin-bottom: var(--space-md); }
+
+    /* ── Settings modal ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(26, 26, 24, 0.25);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 48px;
+      z-index: 10;
+    }
+    .modal {
+      width: 460px;
+      max-height: calc(100vh - 96px);
+      overflow-y: auto;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-rule);
+      padding: var(--space-lg);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.14);
+    }
+    .modal h2 { font-size: 14px; margin-bottom: var(--space-md); }
+    .field { margin-bottom: var(--space-md); }
+    .field label { display: block; font-size: 11px; font-weight: 600; color: var(--color-ink-2); margin-bottom: 4px; }
+    .field .hint { font-size: 10px; color: var(--color-ink-4); margin-top: 3px; }
+    .field input[type="text"], .field input[type="password"], .field input[type="number"], .field textarea, .field select {
+      width: 100%; font-size: 12px;
+    }
+    .field textarea { min-height: 56px; resize: vertical; }
+    .field-row { display: flex; gap: var(--space-sm); align-items: center; }
+    .field-row input { flex: 1; }
+    .token-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-ink-3); margin-bottom: 6px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .dot.ok { background: var(--color-add); }
+    .dot.bad { background: var(--color-ink-4); }
+    .validation { font-size: 11px; margin-top: 6px; user-select: text; -webkit-user-select: text; }
+    .validation.ok { color: var(--color-add); }
+    .validation.err { color: var(--color-rem); }
+    .modal-actions { display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: var(--space-lg); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: var(--color-ink);
+      color: var(--color-surface);
+      font-size: 11.5px;
+      padding: 7px 14px;
+      border-radius: var(--radius-md);
+      z-index: 20;
+      max-width: 70vw;
+    }
+
+    a { color: var(--color-accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav class="rail" id="rail"></nav>
+  <div class="main">
+    <div class="toolbar" id="toolbar"></div>
+    <div class="content">
+      <div class="pane" id="pane"></div>
+      <aside class="detail" id="detail" hidden></aside>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+<script type="module">
+import { runtime } from '/sdk/mim.js'
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+const BUILTIN_VIEWS = [
+  { id: 'all', label: 'All items', kind: 'items' },
+  { id: 'issues', label: 'Open issues', kind: 'items' },
+  { id: 'prs', label: 'Open PRs', kind: 'items' },
+  { id: 'closed', label: 'Recently closed', kind: 'items' },
+  { id: 'activity', label: 'Activity', kind: 'activity' },
+  { id: 'summaries', label: 'Summaries', kind: 'summaries' },
+]
+
+const STATE_COLORS = {
+  OPEN: 'var(--color-add)',
+  DRAFT: 'var(--color-ink-4)',
+  MERGED: 'var(--color-accent)',
+  CLOSED: 'var(--color-ink-3)',
+}
+
+const S = {
+  items: [], events: [], repos: [],
+  settings: null, syncState: null, reports: [], savedViews: [],
+  view: 'all', layout: 'list', groupBy: 'state', sort: 'updated',
+  filters: { q: '', type: '', state: '', repo: '', author: '', label: '', projectStatus: '' },
+  selectedKey: null,
+  tokenSet: false,
+  syncing: null,           // { runId, label, fraction }
+  summarizing: null,       // { runId, label }
+  models: [],
+  validateToolName: null,
+  sumRange: 'week', sumFrom: '', sumTo: '', sumUser: '', sumFocus: '',
+}
+
+const $ = (id) => document.getElementById(id)
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+// ── Data loading ───────────────────────────────────────────────────────────
+
+const unwrap = (rows) => (rows || []).map((r) => (r && typeof r === 'object' && 'value' in r ? r.value : r)).filter(Boolean)
+
+async function loadAll() {
+  const [items, events, repos, settings, syncState, reports, savedViews, secretStatus] = await Promise.all([
+    runtime.data.collection('items').list(),
+    runtime.data.collection('events').list(),
+    runtime.data.collection('repos').list(),
+    runtime.data.kv.get('settings'),
+    runtime.data.kv.get('syncState'),
+    runtime.data.kv.get('reports'),
+    runtime.data.kv.get('savedViews'),
+    runtime.secrets.status().catch(() => []),
+  ])
+  S.items = unwrap(items)
+  S.events = unwrap(events).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  S.repos = unwrap(repos)
+  S.settings = settings || null
+  S.syncState = syncState || null
+  S.reports = Array.isArray(reports) ? reports : []
+  S.savedViews = Array.isArray(savedViews) ? savedViews : []
+  S.tokenSet = (secretStatus || []).some((s) => s.name === 'github_token' && s.exists)
+}
+
+async function loadAuxiliary() {
+  try {
+    const registry = await runtime.ai.registry()
+    S.models = Array.isArray(registry?.models) ? registry.models : []
+  } catch { S.models = [] }
+  try {
+    const tools = await runtime.tools.list()
+    const tool = tools.find((t) => t.packageId === 'github-monitor' && t.id === 'validateToken')
+    S.validateToolName = tool?.publicName || null
+  } catch { S.validateToolName = null }
+}
+
+// ── Jobs ───────────────────────────────────────────────────────────────────
+
+async function startSync(full) {
+  if (S.syncing) return
+  try {
+    const run = await runtime.jobs.start('sync', { full: !!full }, { openWork: false })
+    S.syncing = { runId: run.runId, label: full ? 'Full sync…' : 'Syncing…', fraction: 0 }
+    renderToolbar(); renderRail()
+    const off = runtime.jobs.on(run.runId, async (event) => {
+      if (event.type === 'job.step') { S.syncing = { ...S.syncing, label: event.data?.name || '' } }
+      if (event.type === 'job.progress') {
+        S.syncing = { ...S.syncing, fraction: event.data?.value ?? 0, label: event.data?.label || S.syncing.label }
+      }
+      if (event.type === 'job.done' || event.type === 'job.failed') {
+        off()
+        S.syncing = null
+        if (event.type === 'job.failed') toast(`Sync failed: ${event.data?.error || 'unknown error'}`)
+        await loadAll()
+        render()
+        return
+      }
+      renderToolbar()
+    })
+  } catch (err) {
+    S.syncing = null
+    toast(`Sync failed to start: ${err.message}`)
+    render()
+  }
+}
+
+async function startSummarize() {
+  if (S.summarizing) return
+  const range = summaryRange()
+  if (!range) { toast('Pick a valid timeframe first.'); return }
+  const inputs = { from: range.from, to: range.to }
+  if (S.sumUser) inputs.user = S.sumUser
+  if (S.sumFocus.trim()) inputs.focus = S.sumFocus.trim()
+  try {
+    const run = await runtime.jobs.start('summarize', inputs, { openWork: false })
+    S.summarizing = { runId: run.runId, label: 'Starting…' }
+    renderPane()
+    const off = runtime.jobs.on(run.runId, async (event) => {
+      if (event.type === 'job.step') S.summarizing = { ...S.summarizing, label: event.data?.name || '' }
+      if (event.type === 'job.progress' && event.data?.label) S.summarizing = { ...S.summarizing, label: event.data.label }
+      if (event.type === 'job.done' || event.type === 'job.failed') {
+        off()
+        S.summarizing = null
+        if (event.type === 'job.failed') toast(`Summary failed: ${event.data?.error || 'unknown error'}`)
+        await loadAll()
+        render()
+        return
+      }
+      renderPane()
+    })
+  } catch (err) {
+    S.summarizing = null
+    toast(`Summary failed to start: ${err.message}`)
+    renderPane()
+  }
+}
+
+// ── View predicates and filters ────────────────────────────────────────────
+
+function viewItems() {
+  let rows = S.items
+  if (S.view === 'issues') rows = rows.filter((i) => i.type === 'issue' && i.state === 'OPEN')
+  if (S.view === 'prs') rows = rows.filter((i) => i.type === 'pr' && (i.state === 'OPEN' || i.state === 'DRAFT'))
+  if (S.view === 'closed') {
+    const cutoff = new Date(Date.now() - 14 * 86_400_000).toISOString()
+    rows = rows.filter((i) => (i.state === 'CLOSED' || i.state === 'MERGED') && i.updatedAt >= cutoff)
+  }
+  const f = S.filters
+  if (f.type) rows = rows.filter((i) => i.type === f.type)
+  if (f.state) rows = rows.filter((i) => displayState(i) === f.state)
+  if (f.repo) rows = rows.filter((i) => i.repo === f.repo)
+  if (f.author) rows = rows.filter((i) => i.author === f.author || (i.assignees || []).includes(f.author))
+  if (f.label) rows = rows.filter((i) => (i.labels || []).some((l) => l.name === f.label))
+  if (f.projectStatus) rows = rows.filter((i) => (i.projectStatus || '') === f.projectStatus)
+  if (f.q) {
+    const q = f.q.toLowerCase()
+    rows = rows.filter((i) =>
+      i.title.toLowerCase().includes(q) || i.key.toLowerCase().includes(q) ||
+      (i.author || '').toLowerCase().includes(q) || (i.bodyExcerpt || '').toLowerCase().includes(q))
+  }
+  const sorters = {
+    updated: (a, b) => (a.updatedAt < b.updatedAt ? 1 : -1),
+    created: (a, b) => (a.createdAt < b.createdAt ? 1 : -1),
+    comments: (a, b) => (b.commentCount || 0) - (a.commentCount || 0),
+  }
+  return [...rows].sort(sorters[S.sort] || sorters.updated)
+}
+
+function displayState(item) {
+  if (item.mergedAt || item.state === 'MERGED') return 'MERGED'
+  return item.state || 'OPEN'
+}
+
+function uniqueSorted(values) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b))
+}
+
+function allPeople() {
+  return uniqueSorted([
+    ...S.items.flatMap((i) => [i.author, ...(i.assignees || [])]),
+    ...S.events.map((e) => e.actor),
+  ])
+}
+
+// ── Time helpers ───────────────────────────────────────────────────────────
+
+function fmtAgo(iso) {
+  if (!iso) return 'never'
+  const sec = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
+  if (sec < 60) return 'just now'
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`
+  return `${Math.floor(sec / 86400)}d ago`
+}
+
+function startOfWeek(date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = (d.getDay() + 6) % 7 // Monday = 0
+  d.setDate(d.getDate() - day)
+  return d
+}
+
+function summaryRange() {
+  const now = new Date()
+  if (S.sumRange === 'week') return { from: startOfWeek(now).toISOString(), to: now.toISOString() }
+  if (S.sumRange === 'lastweek') {
+    const thisMonday = startOfWeek(now)
+    const lastMonday = new Date(thisMonday.getTime() - 7 * 86_400_000)
+    return { from: lastMonday.toISOString(), to: thisMonday.toISOString() }
+  }
+  if (S.sumRange === '30d') return { from: new Date(now.getTime() - 30 * 86_400_000).toISOString(), to: now.toISOString() }
+  if (S.sumRange === 'custom') {
+    if (!S.sumFrom || !S.sumTo) return null
+    const from = new Date(`${S.sumFrom}T00:00:00`)
+    const to = new Date(`${S.sumTo}T23:59:59`)
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return null
+    return { from: from.toISOString(), to: to.toISOString() }
+  }
+  return null
+}
+
+// ── Render: rail ───────────────────────────────────────────────────────────
+
+function renderRail() {
+  const counts = {
+    all: S.items.length,
+    issues: S.items.filter((i) => i.type === 'issue' && i.state === 'OPEN').length,
+    prs: S.items.filter((i) => i.type === 'pr' && (i.state === 'OPEN' || i.state === 'DRAFT')).length,
+  }
+  const builtin = BUILTIN_VIEWS.map((view) => `
+    <button class="rail-item ${S.view === view.id ? 'active' : ''}" data-view="${view.id}">
+      ${esc(view.label)}
+      ${counts[view.id] != null ? `<span class="count">${counts[view.id]}</span>` : ''}
+    </button>`).join('')
+
+  const saved = S.savedViews.map((view) => `
+    <button class="rail-item ${S.view === `saved:${view.id}` ? 'active' : ''}" data-view="saved:${view.id}">
+      ${esc(view.name)}
+      <span class="del" data-delview="${view.id}" title="Delete view">×</span>
+    </button>`).join('')
+
+  $('rail').innerHTML = `
+    <div class="rail-section">Views</div>
+    ${builtin}
+    ${S.savedViews.length ? '<div class="rail-section">Saved</div>' : ''}
+    ${saved}
+    <div class="rail-footer">
+      <div class="sync-meta">${S.settings?.org ? `org: ${esc(S.settings.org)}` : 'not configured'}</div>
+      <div class="sync-meta">synced ${fmtAgo(S.syncState?.lastSyncAt)}</div>
+      <button class="rail-item" data-action="settings" style="padding-left:0">⚙ Settings</button>
+    </div>`
+
+  $('rail').querySelectorAll('[data-view]').forEach((el) => {
+    el.addEventListener('click', (ev) => {
+      if (ev.target.dataset.delview) return
+      selectView(el.dataset.view)
+    })
+  })
+  $('rail').querySelectorAll('[data-delview]').forEach((el) => {
+    el.addEventListener('click', async (ev) => {
+      ev.stopPropagation()
+      S.savedViews = S.savedViews.filter((v) => String(v.id) !== el.dataset.delview)
+      await runtime.data.kv.set('savedViews', S.savedViews)
+      if (S.view === `saved:${el.dataset.delview}`) S.view = 'all'
+      render()
+    })
+  })
+  $('rail').querySelector('[data-action="settings"]').addEventListener('click', () => openSettings())
+}
+
+function selectView(id) {
+  S.view = id
+  S.selectedKey = null
+  if (id.startsWith('saved:')) {
+    const view = S.savedViews.find((v) => `saved:${v.id}` === id)
+    if (view?.state) {
+      S.filters = { ...S.filters, ...view.state.filters }
+      S.sort = view.state.sort || 'updated'
+      S.layout = view.state.layout || 'list'
+      S.groupBy = view.state.groupBy || 'state'
+    }
+  } else {
+    S.filters = { q: '', type: '', state: '', repo: '', author: '', label: '', projectStatus: '' }
+  }
+  render()
+}
+
+// ── Render: toolbar ────────────────────────────────────────────────────────
+
+function currentViewLabel() {
+  if (S.view.startsWith('saved:')) {
+    return S.savedViews.find((v) => `saved:${v.id}` === S.view)?.name || 'Saved view'
+  }
+  return BUILTIN_VIEWS.find((v) => v.id === S.view)?.label || 'GitHub'
+}
+
+function currentViewKind() {
+  if (S.view === 'activity') return 'activity'
+  if (S.view === 'summaries') return 'summaries'
+  return 'items'
+}
+
+function option(value, label, selected) {
+  return `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`
+}
+
+function renderToolbar() {
+  const kind = currentViewKind()
+  const syncBits = S.syncing
+    ? `<span class="sync-progress">
+         <span class="sync-bar"><i style="width:${Math.round((S.syncing.fraction || 0) * 100)}%"></i></span>
+         ${esc(S.syncing.label || 'Syncing…')}
+       </span>`
+    : `<button class="btn" id="btn-sync" title="Sync now (⌥-click for a full re-sync)">Sync</button>`
+
+  let filterBits = ''
+  if (kind === 'items') {
+    const repos = uniqueSorted(S.items.map((i) => i.repo))
+    const labels = uniqueSorted(S.items.flatMap((i) => (i.labels || []).map((l) => l.name)))
+    const statuses = uniqueSorted(S.items.map((i) => i.projectStatus))
+    const people = allPeople()
+    filterBits = `
+      <span class="search-box"><input class="search-input" id="f-q" placeholder="Search…" value="${esc(S.filters.q)}"></span>
+      <button class="pill ${S.filters.type === 'issue' ? 'active' : ''}" data-pill-type="issue">Issues</button>
+      <button class="pill ${S.filters.type === 'pr' ? 'active' : ''}" data-pill-type="pr">PRs</button>
+      <select class="select" id="f-state">
+        ${option('', 'State', !S.filters.state)}
+        ${['OPEN', 'DRAFT', 'MERGED', 'CLOSED'].map((s) => option(s, s.toLowerCase(), S.filters.state === s)).join('')}
+      </select>
+      <select class="select" id="f-repo">
+        ${option('', 'Repo', !S.filters.repo)}
+        ${repos.map((r) => option(r, r.split('/')[1] || r, S.filters.repo === r)).join('')}
+      </select>
+      <select class="select" id="f-author">
+        ${option('', 'Person', !S.filters.author)}
+        ${people.map((p) => option(p, p, S.filters.author === p)).join('')}
+      </select>
+      ${labels.length ? `<select class="select" id="f-label">
+        ${option('', 'Label', !S.filters.label)}
+        ${labels.map((l) => option(l, l, S.filters.label === l)).join('')}
+      </select>` : ''}
+      ${statuses.length ? `<select class="select" id="f-status">
+        ${option('', 'Status', !S.filters.projectStatus)}
+        ${statuses.map((s) => option(s, s, S.filters.projectStatus === s)).join('')}
+      </select>` : ''}
+      <select class="select" id="f-sort">
+        ${option('updated', 'Updated', S.sort === 'updated')}
+        ${option('created', 'Created', S.sort === 'created')}
+        ${option('comments', 'Comments', S.sort === 'comments')}
+      </select>
+      <button class="pill ${S.layout === 'board' ? 'active' : ''}" id="btn-layout">Board</button>
+      ${S.layout === 'board' ? `<select class="select" id="f-group">
+        ${option('state', 'By state', S.groupBy === 'state')}
+        ${option('assignee', 'By assignee', S.groupBy === 'assignee')}
+        ${option('projectStatus', 'By project status', S.groupBy === 'projectStatus')}
+      </select>` : ''}
+      <button class="pill" id="btn-save-view" title="Save current filters as a view">＋ Save view</button>`
+  }
+
+  $('toolbar').innerHTML = `
+    <span class="toolbar-title">${esc(currentViewLabel())}</span>
+    ${filterBits}
+    <span class="toolbar-spacer"></span>
+    ${syncBits}`
+
+  $('btn-sync')?.addEventListener('click', (ev) => startSync(ev.altKey))
+  const q = $('f-q')
+  if (q) {
+    q.addEventListener('input', () => { S.filters.q = q.value; renderPane() })
+    q.addEventListener('keydown', (ev) => ev.stopPropagation())
+  }
+  $('toolbar').querySelectorAll('[data-pill-type]').forEach((el) => {
+    el.addEventListener('click', () => {
+      S.filters.type = S.filters.type === el.dataset.pillType ? '' : el.dataset.pillType
+      renderToolbar(); renderPane()
+    })
+  })
+  const bind = (id, key) => $(id)?.addEventListener('change', () => { S.filters[key] = $(id).value; renderPane() })
+  bind('f-state', 'state'); bind('f-repo', 'repo'); bind('f-author', 'author')
+  bind('f-label', 'label'); bind('f-status', 'projectStatus')
+  $('f-sort')?.addEventListener('change', () => { S.sort = $('f-sort').value; renderPane() })
+  $('f-group')?.addEventListener('change', () => { S.groupBy = $('f-group').value; renderPane() })
+  $('btn-layout')?.addEventListener('click', () => {
+    S.layout = S.layout === 'board' ? 'list' : 'board'
+    renderToolbar(); renderPane()
+  })
+  $('btn-save-view')?.addEventListener('click', saveCurrentView)
+}
+
+async function saveCurrentView() {
+  const name = prompt('Name this view:')
+  if (!name || !name.trim()) return
+  S.savedViews.push({
+    id: Date.now(),
+    name: name.trim().slice(0, 40),
+    state: { filters: { ...S.filters }, sort: S.sort, layout: S.layout, groupBy: S.groupBy },
+  })
+  await runtime.data.kv.set('savedViews', S.savedViews)
+  renderRail()
+}
+
+// ── Render: panes ──────────────────────────────────────────────────────────
+
+function renderPane() {
+  const configured = S.settings?.org && S.tokenSet
+  if (!configured) {
+    $('pane').innerHTML = `
+      <div class="empty"><div class="setup-card card">
+        <h2>Connect GitHub</h2>
+        <p>Add a GitHub token and your organization name, then run the first sync.
+           The token is stored in the system keychain and never leaves this machine
+           except to call api.github.com.</p>
+        <button class="btn primary" id="btn-setup">Open settings</button>
+      </div></div>`
+    $('btn-setup').addEventListener('click', () => openSettings())
+    $('detail').hidden = true
+    return
+  }
+  const kind = currentViewKind()
+  if (kind === 'activity') renderActivity()
+  else if (kind === 'summaries') renderSummaries()
+  else if (S.layout === 'board') renderBoard()
+  else renderList()
+  renderDetail()
+}
+
+function stateDot(item) {
+  return `<span class="state-dot" style="background:${STATE_COLORS[displayState(item)] || 'var(--color-ink-4)'}" title="${esc(displayState(item))}"></span>`
+}
+
+function renderList() {
+  const rows = viewItems()
+  if (rows.length === 0) {
+    $('pane').innerHTML = `<div class="empty"><p style="color:var(--color-ink-4);font-size:12px">${S.items.length === 0 ? 'No data yet — run a sync.' : 'Nothing matches.'}</p></div>`
+    return
+  }
+  $('pane').innerHTML = rows.map((item) => `
+    <div class="row ${S.selectedKey === item.key ? 'selected' : ''}" data-key="${esc(item.key)}">
+      ${stateDot(item)}
+      <span class="row-key">${esc(item.key)}</span>
+      <span class="row-title">${esc(item.title)}</span>
+      <span class="row-labels">${(item.labels || []).slice(0, 3).map((l) =>
+        `<span class="label-chip"><i style="background:#${esc(l.color || 'ccc')}"></i>${esc(l.name)}</span>`).join('')}</span>
+      ${item.commentCount ? `<span class="row-meta">💬 ${item.commentCount}</span>` : ''}
+      <span class="row-author">${esc(item.author)}</span>
+      <span class="row-meta" style="width:54px;text-align:right">${fmtAgo(item.updatedAt)}</span>
+    </div>`).join('')
+  $('pane').querySelectorAll('[data-key]').forEach((el) => {
+    el.addEventListener('click', () => selectItem(el.dataset.key))
+  })
+}
+
+function renderBoard() {
+  const rows = viewItems()
+  let columns
+  if (S.groupBy === 'assignee') {
+    const names = uniqueSorted(rows.map((i) => (i.assignees || [])[0] || ''))
+    columns = names.map((name) => ({ title: name || 'Unassigned', items: rows.filter((i) => ((i.assignees || [])[0] || '') === name) }))
+  } else if (S.groupBy === 'projectStatus') {
+    const statuses = uniqueSorted(rows.map((i) => i.projectStatus || ''))
+    columns = statuses.map((status) => ({ title: status || 'No status', items: rows.filter((i) => (i.projectStatus || '') === status) }))
+  } else {
+    columns = ['OPEN', 'DRAFT', 'MERGED', 'CLOSED']
+      .map((state) => ({ title: state.toLowerCase(), items: rows.filter((i) => displayState(i) === state) }))
+      .filter((c) => c.items.length > 0)
+  }
+  if (columns.length === 0) {
+    $('pane').innerHTML = `<div class="empty"><p style="color:var(--color-ink-4);font-size:12px">Nothing matches.</p></div>`
+    return
+  }
+  $('pane').innerHTML = `<div class="board">${columns.map((col) => `
+    <div class="column">
+      <div class="column-head">${esc(col.title)} <span class="count">${col.items.length}</span></div>
+      <div class="column-cards">${col.items.map((item) => `
+        <div class="gcard ${S.selectedKey === item.key ? 'selected' : ''}" data-key="${esc(item.key)}">
+          <div class="gcard-key">${esc(item.key)}</div>
+          <div class="gcard-title">${esc(item.title)}</div>
+          <div class="gcard-meta">
+            <span>${esc(item.author)}</span>
+            ${item.commentCount ? `<span>💬 ${item.commentCount}</span>` : ''}
+            <span>${fmtAgo(item.updatedAt)}</span>
+          </div>
+        </div>`).join('')}</div>
+    </div>`).join('')}</div>`
+  $('pane').querySelectorAll('[data-key]').forEach((el) => {
+    el.addEventListener('click', () => selectItem(el.dataset.key))
+  })
+}
+
+function renderActivity() {
+  let events = S.events
+  if (S.filters.author) events = events.filter((e) => e.actor === S.filters.author)
+  if (S.filters.repo) events = events.filter((e) => e.repo === S.filters.repo)
+  if (events.length === 0) {
+    $('pane').innerHTML = `<div class="empty"><p style="color:var(--color-ink-4);font-size:12px">No activity synced yet.</p></div>`
+    return
+  }
+  const byDay = new Map()
+  for (const event of events) {
+    const day = (event.createdAt || '').slice(0, 10)
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day).push(event)
+  }
+  $('pane').innerHTML = `<div class="feed">${[...byDay.entries()].map(([day, dayEvents]) => `
+    <div class="feed-day">${esc(day)}</div>
+    ${dayEvents.map((e) => `
+      <div class="feed-row">
+        <span class="feed-time">${esc((e.createdAt || '').slice(11, 16))}</span>
+        <span class="feed-actor">${esc(e.actor)}</span>
+        <span class="feed-repo">${esc((e.repo || '').split('/')[1] || e.repo)}</span>
+        <span class="feed-summary">${esc(e.summary)}</span>
+      </div>`).join('')}`).join('')}</div>`
+}
+
+function renderSummaries() {
+  const people = allPeople()
+  const running = S.summarizing
+  $('pane').innerHTML = `<div class="summaries">
+    <h2>Activity summaries</h2>
+    <div class="sum-controls">
+      ${['week:This week', 'lastweek:Last week', '30d:Last 30 days', 'custom:Custom'].map((preset) => {
+        const [id, label] = preset.split(':')
+        return `<button class="pill ${S.sumRange === id ? 'active' : ''}" data-range="${id}">${label}</button>`
+      }).join('')}
+      ${S.sumRange === 'custom' ? `
+        <input type="date" id="sum-from" value="${esc(S.sumFrom)}">
+        <span style="color:var(--color-ink-4);font-size:11px">to</span>
+        <input type="date" id="sum-to" value="${esc(S.sumTo)}">` : ''}
+      <select class="select" id="sum-user">
+        ${option('', 'Everyone', !S.sumUser)}
+        ${people.map((p) => option(p, p, S.sumUser === p)).join('')}
+      </select>
+    </div>
+    <div class="sum-controls">
+      <input type="text" id="sum-focus" placeholder="Optional focus, e.g. release readiness" value="${esc(S.sumFocus)}">
+      ${running
+        ? `<span class="sync-progress">${esc(running.label || 'Summarizing…')}</span>`
+        : `<button class="btn primary" id="btn-summarize">Summarize</button>`}
+    </div>
+    ${S.reports.length ? `
+      <div class="rail-section" style="padding-left:0">Reports</div>
+      ${S.reports.map((report) => `
+        <div class="report-row">
+          <span class="report-date">${esc((report.generatedAt || '').slice(0, 10))}</span>
+          <span class="report-headline">${esc(report.headline || report.path)}</span>
+          <span class="report-range">${esc((report.from || '').slice(0, 10))} → ${esc((report.to || '').slice(0, 10))}${report.user ? ` · ${esc(report.user)}` : ''}</span>
+          <a class="report-open" data-report="${esc(report.path)}">open</a>
+        </div>`).join('')}`
+      : '<p style="font-size:11px;color:var(--color-ink-4)">No reports yet. Summaries are written to reports/github/ in the workspace.</p>'}
+  </div>`
+
+  $('pane').querySelectorAll('[data-range]').forEach((el) => {
+    el.addEventListener('click', () => { S.sumRange = el.dataset.range; renderPane() })
+  })
+  $('sum-from')?.addEventListener('change', () => { S.sumFrom = $('sum-from').value })
+  $('sum-to')?.addEventListener('change', () => { S.sumTo = $('sum-to').value })
+  $('sum-user')?.addEventListener('change', () => { S.sumUser = $('sum-user').value })
+  $('sum-focus')?.addEventListener('input', () => { S.sumFocus = $('sum-focus').value })
+  $('btn-summarize')?.addEventListener('click', startSummarize)
+  $('pane').querySelectorAll('[data-report]').forEach((el) => {
+    el.addEventListener('click', () => runtime.call('editor.open', { path: el.dataset.report }).catch((err) => toast(err.message)))
+  })
+}
+
+// ── Render: detail ─────────────────────────────────────────────────────────
+
+function selectItem(key) {
+  S.selectedKey = S.selectedKey === key ? null : key
+  renderPane()
+}
+
+function renderDetail() {
+  const item = S.items.find((i) => i.key === S.selectedKey)
+  const panel = $('detail')
+  if (!item) { panel.hidden = true; return }
+  panel.hidden = false
+  const recentEvents = S.events
+    .filter((e) => e.repo === item.repo)
+    .slice(0, 8)
+  panel.innerHTML = `
+    <button class="detail-close" id="detail-close">×</button>
+    <div class="detail-key">${esc(item.key)}</div>
+    <div class="detail-title">${esc(item.title)}</div>
+    <dl class="detail-grid">
+      <dt>State</dt><dd>${esc(displayState(item).toLowerCase())}</dd>
+      <dt>Author</dt><dd>${esc(item.author || '—')}</dd>
+      <dt>Assignees</dt><dd>${esc((item.assignees || []).join(', ') || '—')}</dd>
+      ${item.milestone ? `<dt>Milestone</dt><dd>${esc(item.milestone)}</dd>` : ''}
+      ${item.projectStatus ? `<dt>Project</dt><dd>${esc(item.projectTitle || '')}: ${esc(item.projectStatus)}</dd>` : ''}
+      <dt>Comments</dt><dd>${item.commentCount || 0}</dd>
+      <dt>Updated</dt><dd>${fmtAgo(item.updatedAt)}</dd>
+      <dt>Created</dt><dd>${esc((item.createdAt || '').slice(0, 10))}</dd>
+      <dt>Link</dt><dd><a href="${esc(item.url)}" target="_blank" rel="noreferrer">Open on GitHub ↗</a></dd>
+    </dl>
+    ${(item.labels || []).length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:6px 0">${item.labels.map((l) =>
+      `<span class="label-chip"><i style="background:#${esc(l.color || 'ccc')}"></i>${esc(l.name)}</span>`).join('')}</div>` : ''}
+    ${item.bodyExcerpt ? `<div class="detail-body">${esc(item.bodyExcerpt)}</div>` : ''}
+    ${recentEvents.length ? `
+      <div class="rail-section" style="padding:12px 0 4px">Recent repo activity</div>
+      ${recentEvents.map((e) => `
+        <div class="feed-row">
+          <span class="feed-time">${esc((e.createdAt || '').slice(5, 10))}</span>
+          <span class="feed-actor">${esc(e.actor)}</span>
+          <span class="feed-summary">${esc(e.summary)}</span>
+        </div>`).join('')}` : ''}`
+  $('detail-close').addEventListener('click', () => { S.selectedKey = null; renderPane() })
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────
+
+function openSettings() {
+  const s = S.settings || {}
+  const repoList = Array.isArray(s.repoList) ? s.repoList.join('\n') : ''
+  $('modal-root').innerHTML = `<div class="overlay" id="overlay"><div class="modal">
+    <h2>GitHub Monitor settings</h2>
+
+    <div class="field">
+      <label>GitHub token</label>
+      <div class="token-status">
+        <span class="dot ${S.tokenSet ? 'ok' : 'bad'}"></span>
+        ${S.tokenSet ? 'A token is stored in the system keychain.' : 'No token stored yet.'}
+      </div>
+      <div class="field-row">
+        <input type="password" id="set-token" placeholder="${S.tokenSet ? 'Paste a new token to replace it' : 'ghp_… or github_pat_…'}" autocomplete="off">
+        <button class="btn" id="btn-token-save">Save</button>
+        ${S.tokenSet ? '<button class="btn danger" id="btn-token-del">Remove</button>' : ''}
+      </div>
+      <div class="field-row" style="margin-top:6px">
+        <button class="btn" id="btn-validate" ${S.tokenSet ? '' : 'disabled'}>Validate token</button>
+        <span class="validation" id="validation"></span>
+      </div>
+      <div class="hint">Classic PAT with repo, read:org, read:project scopes. Stored in the OS keychain — never written to files.</div>
+    </div>
+
+    <div class="field">
+      <label>Organization</label>
+      <input type="text" id="set-org" value="${esc(s.org || '')}" placeholder="my-org" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label>Sync window (days)</label>
+      <input type="number" id="set-window" value="${esc(s.syncWindowDays || 90)}" min="1" max="730">
+      <div class="hint">How far back issues, PRs, and activity are kept.</div>
+    </div>
+
+    <div class="field">
+      <label>Repositories</label>
+      <select class="select" id="set-repomode" style="margin-bottom:6px">
+        ${option('all', 'All repositories', !s.repoMode || s.repoMode === 'all')}
+        ${option('include', 'Only these', s.repoMode === 'include')}
+        ${option('exclude', 'All except these', s.repoMode === 'exclude')}
+      </select>
+      <textarea id="set-repolist" placeholder="one repo per line, e.g. my-org/app">${esc(repoList)}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Summary model</label>
+      <select class="select" id="set-model" style="max-width:100%">
+        ${option('', 'Workspace default', !s.summaryModel)}
+        ${S.models.map((m) => option(m.id || m.model, m.label || m.id || m.model, s.summaryModel === (m.id || m.model))).join('')}
+      </select>
+      <div class="hint">Used for AI activity summaries.</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="btn-fullsync">Save &amp; full re-sync</button>
+      <button class="btn" id="btn-cancel">Cancel</button>
+      <button class="btn primary" id="btn-save">Save</button>
+    </div>
+  </div></div>`
+
+  $('overlay').addEventListener('click', (ev) => { if (ev.target.id === 'overlay') closeSettings() })
+  $('btn-cancel').addEventListener('click', closeSettings)
+  $('btn-token-save').addEventListener('click', saveToken)
+  $('btn-token-del')?.addEventListener('click', deleteToken)
+  $('btn-validate').addEventListener('click', validateToken)
+  $('btn-save').addEventListener('click', () => saveSettings(false))
+  $('btn-fullsync').addEventListener('click', () => saveSettings(true))
+}
+
+function closeSettings() { $('modal-root').innerHTML = '' }
+
+async function saveToken() {
+  const input = $('set-token')
+  const value = input.value.trim()
+  if (!value) { toast('Paste a token first.'); return }
+  try {
+    await runtime.secrets.set('github_token', value)
+    input.value = ''
+    S.tokenSet = true
+    toast('Token saved to the keychain.')
+    openSettings() // re-render with the new status
+  } catch (err) { toast(`Could not save token: ${err.message}`) }
+}
+
+async function deleteToken() {
+  try {
+    await runtime.secrets.delete('github_token')
+    S.tokenSet = false
+    toast('Token removed.')
+    openSettings()
+  } catch (err) { toast(`Could not remove token: ${err.message}`) }
+}
+
+async function validateToken() {
+  const out = $('validation')
+  out.className = 'validation'
+  out.textContent = 'Checking…'
+  try {
+    if (!S.validateToolName) await loadAuxiliary()
+    if (!S.validateToolName) throw new Error('validateToken tool not available')
+    const result = await runtime.call('package.tools.execute', { name: S.validateToolName, input: {} })
+    const scopes = (result.scopes || '').split(',').map((s) => s.trim()).filter(Boolean)
+    const missing = ['repo', 'read:org'].filter((s) => !scopes.includes(s))
+    out.className = 'validation ok'
+    out.textContent = `OK — ${result.login}${scopes.length ? ` (${scopes.join(', ')})` : ''}`
+    if (missing.length && scopes.length) {
+      out.className = 'validation err'
+      out.textContent = `Authenticated as ${result.login}, but missing scopes: ${missing.join(', ')}`
+    }
+  } catch (err) {
+    out.className = 'validation err'
+    out.textContent = err.message
+  }
+}
+
+async function saveSettings(fullSync) {
+  const repoList = $('set-repolist').value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
+  const windowDays = parseInt($('set-window').value, 10)
+  const settings = {
+    ...(S.settings || {}),
+    org: $('set-org').value.trim(),
+    syncWindowDays: Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 730) : 90,
+    repoMode: $('set-repomode').value,
+    repoList,
+    summaryModel: $('set-model').value || '',
+  }
+  if (!settings.org) { toast('Set an organization name.'); return }
+  await runtime.data.kv.set('settings', settings)
+  S.settings = settings
+  closeSettings()
+  render()
+  if (fullSync) startSync(true)
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+
+let toastTimer = null
+function toast(message) {
+  $('toast-root').innerHTML = `<div class="toast">${esc(message)}</div>`
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { $('toast-root').innerHTML = '' }, 4000)
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+
+function render() { renderRail(); renderToolbar(); renderPane() }
+
+async function boot() {
+  await runtime.ready
+  await loadAll()
+  render()
+  loadAuxiliary()
+  // Refresh when jobs we did not start (e.g. from chat) finish.
+  runtime.on('package:job:event', async (event) => {
+    if (event?.type !== 'job.done' && event?.type !== 'job.failed') return
+    if (S.syncing?.runId === event.runId || S.summarizing?.runId === event.runId) return
+    await loadAll()
+    render()
+  })
+  // Keep "synced Xm ago" fresh.
+  setInterval(() => { if (!S.syncing) renderRail() }, 30_000)
+}
+
+boot().catch((err) => {
+  document.body.innerHTML = `<div class="empty" style="width:100%"><p style="font-size:12px;color:var(--color-rem)">Failed to start: ${esc(err.message)}</p></div>`
+})
+</script>
+</body>
+</html>
